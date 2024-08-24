@@ -369,7 +369,8 @@ EXIT:
 static void
 prependSharedLibraryPath(const char* prefix)
 {
-    char temp[2048], *p=temp, *end=p+sizeof(temp);
+    /* To enlarge temp size to avoid user's environment path is too long to store */ 
+    char temp[3072], *p=temp, *end=p+sizeof(temp);
 #ifdef _WIN32
     const char* path = getenv("PATH");
     if (path == NULL || path[0] == '\0') {

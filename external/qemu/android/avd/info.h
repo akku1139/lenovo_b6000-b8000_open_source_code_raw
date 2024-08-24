@@ -161,6 +161,7 @@ char*  avdInfo_getDefaultCachePath( AvdInfo*  i );
  * directory contains a file named "system-qemu.img".
  */
 char*  avdInfo_getSystemImagePath( AvdInfo* i );
+char*  avdInfo_getDefaultSystemImagePath( AvdInfo* i );
 
 /* avdInfo_getSystemInitImagePath() retrieves the path to the read-only
  * initialization image for this disk image.

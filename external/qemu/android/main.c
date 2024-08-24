@@ -68,6 +68,10 @@ AndroidRotation  android_framebuffer_rotation;
 #  define  VERSION_STRING  "standalone"
 #endif
 
+// The definitaion for the mtk-hwardware.ini
+#define  MTK_HARDWARE_INI   "mtk-config.ini"
+#define  PREVIOUS_SYSTEM_IMAGE_KEY  "previous.system.path"
+
 #define  D(...)  do {  if (VERBOSE_CHECK(init)) dprint(__VA_ARGS__); } while (0)
 
 extern int  control_console_start( int  port );  /* in control.c */
@@ -176,9 +180,11 @@ int main(int argc, char **argv)
     AConfig*          skinConfig;
     char*             skinPath;
     int               inAndroidBuild;
-    uint64_t          defaultPartitionSize = convertMBToBytes(200);
+    uint64_t          defaultPartitionSize = convertMBToBytes(768);
 
     AndroidOptions  opts[1];
+    bool            isSystemImageChanged = false;
+    IniFile*        mtk_hardware_ini = NULL;
     /* net.shared_net_ip boot property value. */
     char boot_prop_ip[64];
     boot_prop_ip[0] = '\0';
@@ -567,8 +573,12 @@ int main(int argc, char **argv)
                 * (i.e. system-qemu.img) in the content directory.
                 */
                 rwImage = avdInfo_getSystemImagePath(avd);
-                if (rwImage != NULL) {
-                    break;
+                if (rwImage == NULL) {
+                    rwImage = avdInfo_getDefaultSystemImagePath(avd);
+                    if (rwImage == NULL) {
+                        derror("No system image path for this configuration!");
+                        exit(1);
+                    }                        
                 }
                 /* Otherwise, try to find the initial system image */
                 initImage = avdInfo_getSystemInitImagePath(avd);
@@ -591,14 +601,34 @@ int main(int argc, char **argv)
             }
 
         } while (0);
+    
+        {
+            mtk_hardware_ini = iniFile_newFromFile(_getFullFilePath(avdInfo_getContentPath(avd),MTK_HARDWARE_INI));
+            if (mtk_hardware_ini != NULL) {
+                const char* previous_system_image_path = iniFile_getString(mtk_hardware_ini, PREVIOUS_SYSTEM_IMAGE_KEY, NULL);
+                if (strcmp(previous_system_image_path,initImage)) {
+                    isSystemImageChanged = true;
+                    AFREE(previous_system_image_path);
+                }
+            }else {
+                mtk_hardware_ini = iniFile_newFromMemory("", NULL);
+                isSystemImageChanged = true;
+            }
 
-        if (rwImage != NULL) {
+            if (isSystemImageChanged) {
+                iniFile_setValue(mtk_hardware_ini, PREVIOUS_SYSTEM_IMAGE_KEY, initImage);
+                iniFile_saveToFileClean(mtk_hardware_ini, _getFullFilePath(avdInfo_getContentPath(avd),MTK_HARDWARE_INI));
+            }
+            iniFile_free(mtk_hardware_ini);
+        }
+
+        if ((isSystemImageChanged == false) && (rwImage != NULL) && (path_exists(rwImage))) {
             /* Use the read/write image file directly */
             hw->disk_systemPartition_path     = rwImage;
             hw->disk_systemPartition_initPath = NULL;
             D("Using direct system image: %s", rwImage);
         } else if (initImage != NULL) {
-            hw->disk_systemPartition_path = NULL;
+            hw->disk_systemPartition_path = rwImage;
             hw->disk_systemPartition_initPath = initImage;
             D("Using initial system image: %s", initImage);
         }
@@ -611,17 +641,17 @@ int main(int argc, char **argv)
         * automatically, and print a warning.
         *
         */
-        const char* systemImage = hw->disk_systemPartition_path;
+        const char* systemImage = hw->disk_systemPartition_initPath;
         uint64_t    systemBytes;
 
         if (systemImage == NULL)
-            systemImage = hw->disk_systemPartition_initPath;
+            systemImage = hw->disk_systemPartition_path;
 
         if (path_get_size(systemImage, &systemBytes) < 0) {
             derror("Missing system image: %s", systemImage);
             exit(1);
         }
-
+      
         hw->disk_systemPartition_size =
             _adjustPartitionSize("system", systemBytes, defaultPartitionSize,
                                  avdInfo_inAndroidBuild(avd));

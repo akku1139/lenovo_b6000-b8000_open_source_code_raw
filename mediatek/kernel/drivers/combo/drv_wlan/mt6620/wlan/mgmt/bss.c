@@ -2047,7 +2047,6 @@ bssRemoveStaRecFromClientList (
 
     prStaRecOfClientList = &prBssInfo->rStaRecOfClientList;
 
-#if 0
     if (!LINK_IS_EMPTY(prStaRecOfClientList)) {
         P_STA_RECORD_T prCurrStaRec;
 
@@ -2061,19 +2060,6 @@ bssRemoveStaRecFromClientList (
             }
         }
     }
-#endif
-    if (!LINK_IS_EMPTY(prStaRecOfClientList)) {
-           
-           P_LINK_ENTRY_T prLinkEntry = (P_LINK_ENTRY_T)NULL;
-
-           LINK_FOR_EACH(prLinkEntry, prStaRecOfClientList) {
-                    if ((UINT_32)prStaRec == (UINT_32)prLinkEntry) {
-                        LINK_REMOVE_KNOWN_ENTRY(prStaRecOfClientList, &prStaRec->rLinkEntry);
-                       return;
-                    }
-           }
-    }
-
 
     DBGLOG(BSS, INFO, ("Current Client List didn't contain that STA_RECORD_T["MACSTR"] before removing.\n",
         MAC2STR(prStaRec->aucMacAddr)));

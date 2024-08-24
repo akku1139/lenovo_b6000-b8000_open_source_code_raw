@@ -264,6 +264,7 @@ typedef struct AModemRec_
     ARegistrationState       voice_state;
     ARegistrationUnsolMode   data_mode;
     ARegistrationState       data_state;
+    int                      data_cid_state[ MAX_DATA_CONTEXTS]; //MTK, 0: disabled, 1: enabled
     ADataNetworkType         data_network;
 
     /* operator names */
@@ -359,8 +360,13 @@ static void create_holdon(AModem modem);
 
 static const char*
 amodem_set_data_registration_gemini(const char*  cmd, AModem  modem );
+
+static const char* 
+handlePdnActivate(const char* cmd, AModem modem);
+
 static void sendUrc(void* _void);
 static void charCopy(char* ch, const char* format, ... );
+static const char* handleQueryNetwork(const char *cmd, AModem modem);
 static const char* handleNetwork( const char*  cmd, AModem  modem );
 
 static const char* SetPINFromPUK( const char*  cmd, AModem  modem);
@@ -373,6 +379,7 @@ static const char* handleNetworkRegistrationUrc(const char*  cmd, AModem  modem)
 static const char* handleICCID(const char* cmd,AModem modem);
 
 static const char* handleMessage( const char*  cmd, AModem  modem );
+static const char* handleMessageEx( const char*  cmd, AModem  modem );
 static const char* handleDefinePDP( const char*  cmd, AModem  modem );
 static void setSim(char * ch,AModem modem);
 static const char* handleVersion( const char*  cmd, AModem  modem );
@@ -2184,16 +2191,26 @@ static const char*
 handleListPDPContexts( const char*  cmd, AModem  modem )
 {
     switch (modem->data_mode) {
-        case A_REGISTRATION_UNSOL_ENABLED:
-	 case A_REGISTRATION_UNSOL_ENABLED_FULL:		
-            return "+CGACT: 1, 0\r+CGACT: 2, 0\r+CGACT: 3, 0";
-	case A_REGISTRATION_UNSOL_DISABLED:
-            return "+CGACT: 1, 0\r+CGACT: 2, 0\r+CGACT: 3, 0";
-	  default:
-            return NULL;
+    case A_REGISTRATION_UNSOL_ENABLED:
+    case A_REGISTRATION_UNSOL_ENABLED_FULL:
+        amodem_begin_line(modem);
+        int nn = 1;
+        for (; nn < MAX_DATA_CONTEXTS; nn++) 
+        {
+            amodem_add_line(modem, "+CGACT: %d, %d\r", nn, modem->data_cid_state[nn]);
+            fprintf( stdout, "[Emu][handleListPDPContexts], +CGACT: %d, %d\r", nn, modem->data_cid_state[nn]);
+        }
+       
+        return amodem_end_line(modem);
+
+    case A_REGISTRATION_UNSOL_DISABLED:
+        return "+CGACT: 1, 0\r+CGACT: 2, 0\r+CGACT: 3, 0";
+
+    default:
+        ;
     }
 
- return NULL;
+    return NULL;
 
 #if 0 
    // For data connection
@@ -2207,8 +2224,16 @@ handleListPDPContexts( const char*  cmd, AModem  modem )
         amodem_add_line( modem, "+CGACT: %d,%d\r\n", data->id, data->active );
     }
     return amodem_end_line( modem );
-  #endif
+#endif
 }
+
+//M:start
+static const char* 
+handleQueryPDP (const char *cmd, AModem modem) 
+{
+    return "+CGDCONT: (0-8),\"IP\",,,(0),(0),(0-1),(0-1),(0-2),(0-1)\r\n";
+}
+//M:end
 
 static const char*
 handleDefinePDPContext( const char*  cmd, AModem  modem )
@@ -2705,17 +2730,22 @@ static const struct {
 	//[Emu]TODO gprs
     // +2011_09_02
     // Add handling of new data service AT command for the change in telephony framework.
-    { "!A+EGTYPE?", "+EGTYPE: 0", NULL },
-    { "!B+EGTYPE?", "+EGTYPE: 0", NULL },
+    //M:start
+    { "!A+EGTYPE?", NULL, handleQueryNetwork},
+    { "!B+EGTYPE?", NULL, handleQueryNetwork},
+    //M:end
     // -2011_09_02
 	{ "!A+EGTYPE", NULL, handleNetwork },
 	{ "!B+EGTYPE", NULL, handleNetwork },
-	/*
+    /*
 	 * sms
 	 */
 	//{ "!+CMGS", NULL, handleSendSMS },    /* see requestSendSMS() */
 	//{ "!+CMGS", "+CMGS: 0", NULL },	
-	{ "!+CMGS",NULL, handleMessage },	
+	{ "!+CMGS",NULL, handleMessage },
+    // MTK-START
+    { "!+EMGS",NULL, handleMessageEx },
+    // MTK-END
 
      /*
        * call - hang up
@@ -2757,6 +2787,9 @@ static const struct {
 
     /* see requestWriteSmsToSim() */
     { "!+CMGW=", NULL, handleSendSMStoSIM },
+    // MTK-START
+    { "!+EMGW=", NULL, handleSendSMStoSIM },
+    // MTK-END
     { "B+ICCID?", NULL, handleICCID},
     { "A+ICCID?", NULL, handleICCID},
     /* see requestSignalStrength() */
@@ -2771,6 +2804,9 @@ static const struct {
      * data connection
      */
     //{ "!+CGDCONT=", NULL, handleDefinePDPContext },
+    //M:start
+    { "+CGDCONT=?", NULL, handleQueryPDP},
+    //M:end
     { "+CGDCONT?", NULL, handleDefinePDP},
     { "!+CGQREQ=", NULL, NULL },
     { "+CGQMIN=1", NULL, NULL },
@@ -2781,7 +2817,7 @@ static const struct {
     { "+CGPRCO=1,\"\",\"\",\"\",\"\",1,1", NULL, NULL },
     { "+CGPRCO=1,\"\",\"\",\"\",\"\",2,1", NULL, NULL },
     { "+CGPRCO=1,\"\",\"\",\"\",\"\",3,1", NULL, NULL },
-    { "+CGACT=1,1", NULL, NULL },
+    { "+CGACT=1,1", NULL, handlePdnActivate },
     { "+CGPADDR=1", "+CGPADDR: 1, \"127.0.0.1", NULL },
     { "+CGPRCO?", "+CGPRCO: 1, \"10.0.2.3\", \"10.0.2.4\"\r+CGPRCO: 2, \"172.21.120.6\", \"0.0.0.0\"\r+CGPRCO: 3, \"172.21.120.6\", \"0.0.0.0\"", NULL },
     { "+CGDATA=\"M-UPS\",1", NULL, NULL },
@@ -2846,7 +2882,8 @@ static const struct {
 	//get modem top support 
     { "+EPSB?","+EPSB: 55", NULL },
     { "+CGDCONT=1,\"IP\",\"cmnet\",,0,0",NULL, NULL },
-
+    //{ "+CGATT=1", NULL, NULL },
+    { "!+CGATT=", NULL, NULL },
 
     /* end of list */
     {NULL, NULL, NULL}
@@ -3074,24 +3111,52 @@ static void create_holdon(AModem modem)
 {
 }
 
+static const char* 
+handlePdnActivate(const char* cmd, AModem modem) 
+{
+    amodem_set_data_registration_gemini(cmd, modem);
+    if(modem->data_state == A_REGISTRATION_UNSOL_ENABLED) {
+        int nn = 1;
+        fprintf(stdout, "[Emu][handlePdnActivate]\n");
+        for (; nn < MAX_DATA_CONTEXTS; nn++) 
+        {
+            fprintf(stdout, "[Emu][handlePdnActivate], cid: %d, status: %d\n", nn, modem->data_cid_state[nn]);
+            if (modem->data_cid_state[nn] == 1) { //make sure only one cid activate at the same time
+                fprintf(stdout, "[Emu][handlePdnActivate] response +CGEV: ME PDN ACT %d\n", nn);
+                amodem_begin_line(modem);
+                amodem_add_line(modem, "+CGEV: ME PDN ACT %d\r", nn);
+                return amodem_end_line(modem);
+            }
+        }
+    }
+    return NULL;
+}
 
 static const char*
 amodem_set_data_registration_gemini(const char*  cmd, AModem  modem )
 {
+    fprintf (stdout, "[Emu][amodem_set_data_registration_gemini] %s\r", cmd);
     if ( !memcmp(cmd, "+CGACT=", 7) ) {
-		cmd += 7;
+        cmd += 7;
+        int enabled = 0;
+        switch(cmd[0]){
+        case '0':
+            modem->data_state = A_REGISTRATION_UNSOL_DISABLED;
+            break;
+        case '1':
+            modem->data_state = A_REGISTRATION_UNSOL_ENABLED;
+            enabled = 1;
+            break;			
+        default:    // '0' or else
+            modem->data_state = A_REGISTRATION_UNSOL_DISABLED;
+        };
 
-	switch(cmd[0]){
-		case '0':
-			modem->data_state = A_REGISTRATION_UNSOL_DISABLED;
-			break;
-		case '1':
-			modem->data_state = A_REGISTRATION_UNSOL_ENABLED;
-			break;
-			
-       	 default:
-           	 ;
-	}
+        cmd += 2;  // skip "," 
+        int idx = cmd[0] - '0';
+        if (idx > 0 && idx < 4) {
+            modem->data_cid_state[idx] = enabled;
+            fprintf( stdout, "[Emu][amodem_set_data_registration_gemini], +CGACT: %d, %d\r", idx, modem->data_cid_state[idx]);
+        }
     }
     return NULL;
 }
@@ -3104,12 +3169,25 @@ static void sendUrc(void* _void)
 
 static void charCopy(char* ch, const char* format, ... )
 {
-	va_list  args;
-       va_start(args, format);
-       vsnprintf( ch, 1024, format, args );
-       va_end(args);
-	printf("[Emu] ch %s\r\n",ch);
+    va_list  args;
+    va_start(args, format);
+    vsnprintf( ch, 1024, format, args );
+    va_end(args);
+    printf("[Emu] ch %s\r\n",ch);
 }
+
+static const char* 
+handleQueryNetwork(const char *cmd, AModem modem) {
+    printf("[Emu] handleQueryNetwork %s\r\n",cmd);
+    static const char *pszEGTYPEEnable = "+EGTYPE: 1";
+    static const char *pszRetVal =  "+EGTYPE: 0";
+    if ((cmd[0] == CHAR_A && CHAR_A == modem->data_sim_ch && A_NETWORK_STATE_SIM1 == modem->data_sim) ||
+        (cmd[0] == CHAR_B && CHAR_B == modem->data_sim_ch && A_NETWORK_STATE_SIM2 == modem->data_sim))
+        pszRetVal = pszEGTYPEEnable;
+        
+    return pszRetVal;
+}
+
 
 static const char*
 handleNetwork( const char*  cmd, AModem  modem )
@@ -3124,15 +3202,15 @@ handleNetwork( const char*  cmd, AModem  modem )
     cmd += 1;
     printf("[Emu] handleNetwork %s\r\n",cmd);
     if ( !memcmp(cmd, "+EGTYPE=0,1", 11) ) {
-	printf("[Emu] handleNetwork +EGTYPE=0,1 \r\n");
-	cmd += 11;
-	amodem_gemini_set_data_sim(modem,modem->data_sim_ch);
-	printf("[Emu]+EGTYPE=0,1 %d\r\n",modem->data_sim);
-	amodem_unsol( modem, "%c+CGEV: ME DETACH\r",modem->data_sim_ch);
-	charCopy( modem->urc_buf, "%c+CGREG: 4\r",modem->data_sim_ch);
-	printf("[Emu]modem->urc_buf %s\r\n",modem->urc_buf);
-	modem->timer = sys_timer_create();
-	sys_timer_set( modem->timer, sys_time_ms() + CALL_DELAY_DIAL,sendUrc, modem );
+    	printf("[Emu] handleNetwork +EGTYPE=0,1 \r\n");
+    	cmd += 11;
+    	amodem_gemini_set_data_sim(modem,modem->data_sim_ch);
+    	printf("[Emu]+EGTYPE=0,1 %d\r\n",modem->data_sim);
+    	amodem_unsol( modem, "%c+CGEV: ME DETACH\r",modem->data_sim_ch);
+    	charCopy( modem->urc_buf, "%c+CGREG: 4\r",modem->data_sim_ch);
+    	printf("[Emu]modem->urc_buf %s\r\n",modem->urc_buf);
+    	modem->timer = sys_timer_create();
+    	sys_timer_set( modem->timer, sys_time_ms() + CALL_DELAY_DIAL,sendUrc, modem );
   	#if 0
 	if(A_NETWORK_STATE_OFF == modem->data_sim){
 		amodem_gemini_set_data_sim(modem,modem->data_sim_ch);
@@ -3158,24 +3236,28 @@ handleNetwork( const char*  cmd, AModem  modem )
        }
 	#endif
     }
-   else if(!memcmp(cmd, "+EGTYPE=0",9)){
-   	printf("[Emu] handleNetwork +EGTYPE=0 \r\n");
-	cmd+=9;
-	if(cmd[0] == modem->data_sim_ch ){
-		amodem_unsol( modem, "%c+CGEV: ME DETACH\r",cmd[0]);
+    else if(!memcmp(cmd, "+EGTYPE=0",9))
+    {
+        printf("[Emu] handleNetwork +EGTYPE=0 \r\n");
+        cmd+=9;
+	if(cmd[0] == modem->data_sim_ch )
+        {
+            amodem_unsol( modem, "%c+CGEV: ME DETACH\r",cmd[0]);
+            amodem_gemini_set_data_sim( modem, NULL);
 	}
-   }
-   else if (!memcmp(cmd,"+EGTYPE=1",9)){
-   	printf("[Emu] handleNetwork +EGTYPE=1 \r\n");
+    }
+    else if (!memcmp(cmd,"+EGTYPE=1",9) || !memcmp(cmd,"+EGTYPE=2", 9))
+    {   //M:start
+   	printf("[Emu] handleNetwork %s \r\n", cmd);
 	cmd+=9;
-		charCopy( modem->urc_buf, "%c+CGREG: 1\r",modem->data_sim_ch);
-		printf("[Emu]modem->urc_buf %s\r\n",modem->urc_buf);
-		modem->timer = sys_timer_create();
-    		sys_timer_set( modem->timer, sys_time_ms() + CALL_DELAY_DIAL,
+	charCopy( modem->urc_buf, "%c+CGREG: 1\r",modem->data_sim_ch);
+	printf("[Emu]modem->urc_buf %s\r\n",modem->urc_buf);
+	modem->timer = sys_timer_create();
+        sys_timer_set( modem->timer, sys_time_ms() + CALL_DELAY_DIAL,
                     				sendUrc, modem );
-		amodem_gemini_set_data_sim( modem, modem->data_sim_ch);
-   }
- return NULL;
+	amodem_gemini_set_data_sim( modem, modem->data_sim_ch);
+    }
+    return NULL;
 }
 
 int
@@ -3494,6 +3576,36 @@ handleMessage( const char*  cmd, AModem  modem )
 	}
 	return  "+CMGS: 0";
 }
+
+// MTK-START
+static const char*
+handleMessageEx( const char*  cmd, AModem  modem )
+{
+	assert(!memcmp( cmd, "+EMGS", 5 ));
+	printf("[Emu] message %s\r\n",cmd);
+	cmd+=5;
+	switch(cmd[0]){
+		case 'A':
+			amodem_gemini_set_sms(modem,1);
+			break;
+		case 'B':
+			amodem_gemini_set_sms(modem,2);
+			break;
+	}
+	char* pos1 = strchr(cmd,'\"');
+	int len=0;
+	if(pos1){
+		char* pos2 = strchr(pos1+1,'\"');
+		if(pos2){
+			len = pos2 - pos1; 
+			char* message = modem->sms_message;
+			strncpy(message,pos1+1,len-1);
+			handleSendSMSText(modem->sms_message, modem);
+		}
+	}
+	return  "+CMGS: 0";
+}
+// MTK-END
 
 static const char*
 handleDefinePDP( const char*  cmd, AModem  modem )

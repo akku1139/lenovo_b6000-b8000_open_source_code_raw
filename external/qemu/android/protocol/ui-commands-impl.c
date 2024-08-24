@@ -99,7 +99,7 @@ _uiCmdImpl_handle_command(UICmdImpl* uicmd,
             break;
         }
 
-				case AUICMD_SET_LED_NOTIFICATION:
+        case AUICMD_SET_LED_NOTIFICATION:
         {
             UICmdSetNotification* cmd = (UICmdSetNotification*)data;
             if (_set_led_notification_callback != NULL) {
@@ -109,7 +109,7 @@ _uiCmdImpl_handle_command(UICmdImpl* uicmd,
             break;
         }
 
-				case AUICMD_SET_VIBRATOR_NOTIFICATION:
+        case AUICMD_SET_VIBRATOR_NOTIFICATION:
         {
             UICmdSetNotification* cmd = (UICmdSetNotification*)data;
             if (_set_vibrator_notification_callback != NULL) {
@@ -284,9 +284,9 @@ uicmd_set_brightness_change_callback(AndroidHwLightBrightnessCallback callback,
 
 int
 uicmd_set_control_change_callback(AndroidHwLightBrightnessCallback callback1,
-																		AndroidHwLedNotificationCallback callback2,
-																		AndroidHwVibratorNotificationCallback callback3,
-                                     void* opaque)
+                                  AndroidHwLedNotificationCallback callback2,
+                                  AndroidHwVibratorNotificationCallback callback3,
+                                  void* opaque)
 {
     _brightness_change_callback = callback1;
     _set_led_notification_callback = callback2;

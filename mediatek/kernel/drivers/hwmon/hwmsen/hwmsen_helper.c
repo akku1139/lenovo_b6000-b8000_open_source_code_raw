@@ -23,7 +23,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/autoconf.h>
+#include <generated/autoconf.h>
 #include <linux/platform_device.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/types.h>
@@ -37,15 +37,7 @@
 #include <linux/hwmsensor.h>
 #include <linux/hwmsen_helper.h>
 
-#ifdef MT6516
-#include <mach/mt6516_reg_base.h>
-#include <mach/mt6516_gpio.h>
-#endif
 
-#ifdef MT6573
-#include <mach/mt6573_reg_base.h>
-#include <mach/mt6573_gpio.h>
-#endif
 /*----------------------------------------------------------------------------*/
 #define hex2int(c) ( (c >= '0') && (c <= '9') ? (c - '0') : ((c & 0xf) + 9) )
 /*----------------------------------------------------------------------------*/

@@ -24,6 +24,15 @@
 #include "android/framebuffer.h"
 #include "android/opengles.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else // !WIN32
+#include <pthread.h>
+#endif
+
+//#include "qemu-thread.h"
+
+
 /* when shrinking, we reduce the pixel ratio by this fixed amount */
 #define  SHRINK_SCALE  0.6
 
@@ -649,7 +658,7 @@ notification_init( Notification*  notification, SkinNotification*  snotification
 {
     SkinRect  r;
 
-		strcpy(notification->name, snotification->name);
+    strncpy(notification->name, snotification->name, sizeof(notification->name));
     notification->image      = skin_image_rotate( snotification->image, loc->rotation );
     notification->background = back;
     notification->shown       = 0;
@@ -990,7 +999,7 @@ layout_init( Layout*  layout, SkinLayout*  slayout )
 
     SKIN_LAYOUT_LOOP_END
 
-		layout->num_notifications     = n_notifications;
+    layout->num_notifications     = n_notifications;
     layout->num_buttons     = n_buttons;
     layout->num_backgrounds = n_backgrounds;
     layout->num_displays    = n_displays;
@@ -1001,12 +1010,12 @@ layout_init( Layout*  layout, SkinLayout*  slayout )
     AARRAY_NEW0(layout->backgrounds, n_backgrounds);
     AARRAY_NEW0(layout->displays,    n_displays);
 
-		if (layout->notifications == NULL && n_notifications > 0) goto Fail;
+    if (layout->notifications == NULL && n_notifications > 0) goto Fail;
     if (layout->buttons == NULL && n_buttons > 0) goto Fail;
     if (layout->backgrounds == NULL && n_backgrounds > 0) goto Fail;
     if (layout->displays == NULL && n_displays > 0) goto Fail;
 
-		n_notifications = 0;
+    n_notifications = 0;
     n_buttons     = 0;
     n_backgrounds = 0;
     n_displays    = 0;
@@ -1605,108 +1614,120 @@ skin_window_set_lcd_brightness( SkinWindow*  window, int  brightness )
     }
 }
 
-Uint32 my_callbackfunc1(Uint32 interval, void *param)
+void my_callbackfunc1(void *param)
 {
-	dprint("my_callbackfunc %p", param);
-	SkinWindow* window = (SkinWindow*)param;	
-	Layout*  layout = &window->layout;
-	Notification*  notification = layout->notifications;
-	Notification*  end    = notification + layout->num_notifications;
-	dprint("layout->num_notifications=%d", layout->num_notifications);
-	for ( ; notification < end; notification++ ) {
-		dprint("my_callbackfunc1 -- layout->notifications=%s, window->notification.name=%s", notification->name, window->led_notification.name);
-		if (!strcmp(notification->name, window->led_notification.name)) {
-			dprint("my_callbackfunc1  led_match");
-			notification->shown = 0;
-		}
-  }
-	
-	skin_window_redraw(window, NULL);
-	SDL_RemoveTimer(window->led_notification.my_timer_id);
+    dprint("my_callbackfunc1 %p \n", param);
+    SkinWindow* window = (SkinWindow*)param;	
+    Layout*  layout = &window->layout;
+    Notification*  notification = layout->notifications;
+    Notification*  end    = notification + layout->num_notifications;
+    dprint("my_callbackfunc1 -- layout->num_notifications=%d \n", layout->num_notifications);
+    sleep_ms(1000);
+    dprint("my_callbackfunc1 -- window->notification.name=%s \n", window->led_notification.name);
+    for ( ; notification < end; notification++ ) {
+        dprint("my_callbackfunc1 -- layout->notifications name=%s \n", notification->name);
+        if (!strcmp(notification->name, window->led_notification.name)) {
+            dprint("my_callbackfunc1  led_match \n");
+            notification->shown = 0;
+        }
+    }
+    dprint("%s start to redraw window", __FUNCTION__);
+    skin_window_redraw(window, NULL);
 }
 
-Uint32 my_callbackfunc2(Uint32 interval, void *param)
+void my_callbackfunc2(void *param)
 {
-	dprint("my_callbackfunc %p", param);
-	SkinWindow* window = (SkinWindow*)param;	
-	Layout*  layout = &window->layout;
-	Notification*  notification = layout->notifications;
-	Notification*  end    = notification + layout->num_notifications;
-	dprint("layout->num_notifications=%d", layout->num_notifications);
-	for ( ; notification < end; notification++ ) {
-		dprint("my_callbackfunc2 -- layout->notifications=%s, window->notification.name=%s", notification->name, window->vibrator_notification.name);
-		if (!strcmp(notification->name, window->vibrator_notification.name)) {
-			dprint("my_callbackfunc2  vibrator_match");
-			notification->shown = 0;
-		}
-  }
-	
-	skin_window_redraw(window, NULL);
-	SDL_RemoveTimer(window->vibrator_notification.my_timer_id);
+    dprint("my_callbackfunc2 %p \n", param);
+    SkinWindow* window = (SkinWindow*)param;	
+    Layout*  layout = &window->layout;
+    Notification*  notification = layout->notifications;
+    Notification*  end    = notification + layout->num_notifications;
+    dprint("my_callbackfunc2 -- layout->num_notifications=%d \n", layout->num_notifications);
+    sleep_ms(1000);
+    dprint("my_callbackfunc2 -- window->notification.name=%s \n", window->led_notification.name);
+    for ( ; notification < end; notification++ ) {
+        dprint("my_callbackfunc2 -- layout->notifications name=%s \n", notification->name);
+        if (!strcmp(notification->name, window->vibrator_notification.name)) {
+            dprint("my_callbackfunc2  vibrator_match \n");
+            notification->shown = 0;
+        }
+    }
+    dprint("%s start to redraw window", __FUNCTION__);
+    skin_window_redraw(window, NULL);
 }
 
 
 void
 skin_window_set_led_notification( SkinWindow*  window, const char* name, int  on, int off, int color )
 {	
-	Layout*  layout = &window->layout;
-	strcpy(window->led_notification.name, name);
-	window->led_notification.on = on;
-	window->led_notification.off = off;
-	window->led_notification.color = color;
+    Layout*  layout = &window->layout;
+    strncpy(window->led_notification.name, name, sizeof(window->led_notification.name));
+    window->led_notification.on = on;
+    window->led_notification.off = off;
+    window->led_notification.color = color;
 	
-	Notification*  notification = layout->notifications;
-	Notification*  end    = notification + layout->num_notifications;
-	dprint("%s layout->num_notifications=%d   %d", __FUNCTION__, layout->notifications, layout->num_notifications);
-	for ( ; notification < end; notification++ ) {
-		dprint("skin_window_set_led_notification -- layout->notifications=%s, window->notification.name=%s", notification->name, window->led_notification.name);
-		if (!strcmp(notification->name, window->led_notification.name)) {
-			dprint("led_match");
-			notification->shown = 1;
-			//led_notification_redraw( notification, &layout->rect, window->surface );
-		}
-  }
-	skin_window_redraw(window, NULL);
-  
-	/* Start the timer; the callback below will be executed after the delay */
-	int delay = (on / 10) * 10;  /* To round it down to the nearest 10 ms */
-	window->led_notification.my_timer_id = SDL_AddTimer(delay, my_callbackfunc1, (void*)window);
-	if (window->led_notification.my_timer_id == 0) {
-		dprint("SDL_AddTimer Error 2: %s\n", SDL_GetError());
-	}
-  
+    Notification*  notification = layout->notifications;
+    Notification*  end    = notification + layout->num_notifications;
+    dprint("%s layout->num_notifications=%d", __FUNCTION__, layout->num_notifications);
+    for ( ; notification < end; notification++ ) {
+        dprint("skin_window_set_led_notification -- layout->notifications name=%s, window->notification.name=%s", notification->name, window->led_notification.name);
+        if (!strcmp(notification->name, window->led_notification.name)) {
+            dprint("led_match");
+            notification->shown = 1;
+            //led_notification_redraw( notification, &layout->rect, window->surface );
+        }
+    }
+    skin_window_redraw(window, NULL);
+
+    {
+#ifdef _WIN32
+        HANDLE thread = 0;
+        dprint("%s parameter=%p",__FUNCTION__, window);
+        thread = CreateThread(NULL, 0, &my_callbackfunc1, (void*)window, 0, 0);
+        CloseHandle(thread);
+#else
+        pthread_t thread;
+        dprint("%s parameter=%p",__FUNCTION__, window);
+        pthread_create(&thread, NULL, (void *)&my_callbackfunc1, (void*)window);
+#endif	
+		
+    }
 }
 
 void
 skin_window_set_vibrator_notification( SkinWindow*  window, const char* name, int  on, int off)
-{	
-	Layout*  layout = &window-> layout;
-	strcpy(window->vibrator_notification.name, name);
-	window->vibrator_notification.on = on;
-	window->vibrator_notification.off = off;
+{
+    Layout*  layout = &window-> layout;
+    strncpy(window->vibrator_notification.name, name,sizeof(window->vibrator_notification.name));
+    window->vibrator_notification.on = on;
+    window->vibrator_notification.off = off;
 	
-	Notification*  notification = layout->notifications;
-	Notification*  end    = notification + layout->num_notifications;
-	dprint("%s layout->num_notifications=%d   %d", __FUNCTION__, layout->notifications, layout->num_notifications);
-	for ( ; notification < end; notification++ ) {
-		dprint("skin_window_set_vibrator_notification -- layout->notifications=%s, window->notification.name=%s", notification->name, window->vibrator_notification.name);
-		if (!strcmp(notification->name, window->vibrator_notification.name)) {
-			dprint("vibrator_match");
-			notification->shown = 1;
-			//vibrator_notification_redraw( notification, &layout->rect, window->surface );
-		}
-  }
-	skin_window_redraw(window, NULL);
-  
-	/* Start the timer; the callback below will be executed after the delay */
-	int delay = (on / 10) * 10;  /* To round it down to the nearest 10 ms */
-	window->vibrator_notification.my_timer_id = SDL_AddTimer(delay, my_callbackfunc2, (void*)window);
-	if (window->vibrator_notification.my_timer_id == 0) {
-		dprint("SDL_AddTimer Error 2: %s\n", SDL_GetError());
-	}
-  
-}
+    Notification*  notification = layout->notifications;
+    Notification*  end    = notification + layout->num_notifications;
+    dprint("%s layout->num_notifications=%d", __FUNCTION__, layout->num_notifications);
+    for ( ; notification < end; notification++ ) {
+        dprint("skin_window_set_vibrator_notification -- layout->notifications name=%s, window->notification.name=%s", notification->name, window->vibrator_notification.name);
+        if (!strcmp(notification->name, window->vibrator_notification.name)) {
+            dprint("vibrator_match");
+            notification->shown = 1;
+        }
+    }
+    skin_window_redraw(window, NULL);
 
+    {
+#ifdef _WIN32
+        HANDLE thread = 0;
+        dprint("%s parameter=%p", __FUNCTION__, window);
+        thread = CreateThread(NULL, 0, &my_callbackfunc2, (void*)window, 0, 0);
+        CloseHandle(thread);
+#else
+        pthread_t thread;
+        dprint("%s parameter=%p", __FUNCTION__, window);
+        pthread_create(&thread, NULL, (void *)&my_callbackfunc2, (void*)window);
+#endif	
+
+    }
+}
 
 void
 skin_window_free  ( SkinWindow*  window )
@@ -1775,9 +1796,23 @@ skin_window_set_scale( SkinWindow*  window, double  scale )
     skin_window_redraw( window, NULL );
 }
 
+static uint32_t
+sdl_surface_map_argb( SDL_Surface* s, uint32_t  c )
+{
+    if (s != NULL) {
+        return SDL_MapRGBA( s->format,
+            ((c) >> 16) & 255,
+            ((c) >> 8) & 255,
+            ((c) & 255),
+            ((c) >> 24) & 255 );
+    }
+    return 0x00000000;
+}
+
 void
 skin_window_redraw( SkinWindow*  window, SkinRect*  rect )
 {
+    dprint("%s ", __FUNCTION__);
     if (window != NULL && window->surface != NULL) {
         Layout*  layout = &window->layout;
 
@@ -1794,7 +1829,8 @@ skin_window_redraw( SkinWindow*  window, SkinRect*  rect )
                 rd.w = r.size.w;
                 rd.h = r.size.h;
 
-                SDL_FillRect( window->surface, &rd, layout->color );
+                SDL_FillRect( window->surface, &rd,
+                              sdl_surface_map_argb( window->surface, layout->color ));
             }
         }
 
@@ -1820,12 +1856,12 @@ skin_window_redraw( SkinWindow*  window, SkinRect*  rect )
         }
 
 				
-				Notification*  notification = layout->notifications;
-				Notification*  end    = notification + layout->num_notifications;
-				for ( ; notification < end; notification++ ) {
-					//dprint("skin_window_redraw -- layout->notifications=%s, window->notification.name=%s", notification->name, window->notification.name);
-						notification_redraw( notification, &layout->rect, window->surface );
-  			}
+        Notification*  notification = layout->notifications;
+        Notification*  end    = notification + layout->num_notifications;
+        for ( ; notification < end; notification++ ) {
+            //dprint("skin_window_redraw -- layout->notifications=%s, window->notification.name=%s", notification->name, window->notification.name);
+            notification_redraw( notification, &layout->rect, window->surface );
+        }
 				
         if ( window->ball.tracking )
             ball_state_redraw( &window->ball, rect, window->surface );

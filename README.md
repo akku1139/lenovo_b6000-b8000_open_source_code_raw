@@ -1,0 +1,1 @@
+# lenovo_b6000-b8000_open_source_code

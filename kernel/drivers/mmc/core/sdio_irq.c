@@ -25,21 +25,24 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sdio_func.h>
+#include <linux/freezer.h>
 
 #include "sdio_ops.h"
 
-static int process_sdio_pending_irqs(struct mmc_card *card)
+static int process_sdio_pending_irqs(struct mmc_host *host)
 {
+	struct mmc_card *card = host->card;
 	int i, ret, count;
 	unsigned char pending;
 	struct sdio_func *func;
 
 	/*
 	 * Optimization, if there is only 1 function interrupt registered
-	 * call irq handler directly
+	 * and we know an IRQ was signaled then call irq handler directly.
+	 * Otherwise do the full probe.
 	 */
 	func = card->sdio_single_irq;
-	if (func) {
+	if (func && host->sdio_irq_pending) {
 		func->irq_handler(func);
 		return 1;
 	}
@@ -85,7 +88,7 @@ static int sdio_irq_thread(void *_host)
 	int ret;
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
-
+        set_freezable();
 	/*
 	 * We want to allow for SDIO cards to work even on non SDIO
 	 * aware hosts.  One thing that non SDIO host cannot do is
@@ -116,7 +119,8 @@ static int sdio_irq_thread(void *_host)
 		ret = __mmc_claim_host(host, &host->sdio_irq_thread_abort);
 		if (ret)
 			break;
-		ret = process_sdio_pending_irqs(host->card);
+		ret = process_sdio_pending_irqs(host);
+		host->sdio_irq_pending = false;
 		mmc_release_host(host);
 
 		/*
@@ -154,6 +158,10 @@ static int sdio_irq_thread(void *_host)
 		if (!kthread_should_stop())
 			schedule_timeout(period);
 		set_current_state(TASK_RUNNING);
+                if (freezing(current))
+                {
+                    try_to_freeze();
+                }
 	} while (!kthread_should_stop());
 
 	if (host->caps & MMC_CAP_SDIO_IRQ) {

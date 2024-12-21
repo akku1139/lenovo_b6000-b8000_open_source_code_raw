@@ -40,8 +40,7 @@ resize2fs_static_libraries := \
 	libext2_com_err \
 	libext2_e2p \
 	libext2_uuid \
-	libext2_blkid \
-	libc
+	libext2_blkid 
 
 resize2fs_shared_libraries := \
 	libext2fs \

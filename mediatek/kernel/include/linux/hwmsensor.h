@@ -1,4 +1,4 @@
-/* alps/ALPS_SW/TRUNK/MAIN/alps/kernel/include/linux/hwmsensor.h
+/* alps
  *
  * (C) Copyright 2009 
  * MediaTek <www.MediaTek.com>
@@ -36,6 +36,8 @@
 #define SENSOR_TYPE_GRAVITY             9
 #define SENSOR_TYPE_LINEAR_ACCELERATION 10
 #define SENSOR_TYPE_ROTATION_VECTOR     11
+/*   midify for Cypress Cap sense CY8C20236A support -- by oujf1 2013-6-3 */
+#define SENSOR_TYPE_CAPSENSOR           14
 
 
 /*---------------------------------------------------------------------------*/
@@ -51,7 +53,10 @@
 #define ID_LIGHT						(ID_BASE+SENSOR_TYPE_LIGHT-1)
 #define ID_PRESSURE						(ID_BASE+SENSOR_TYPE_PRESSURE-1)
 #define ID_TEMPRERATURE					(ID_BASE+SENSOR_TYPE_TEMPERATURE-1)
-#define ID_SENSOR_MAX_HANDLE			(ID_BASE+10)
+/*   midify for Cypress Cap sense CY8C20236A support -- by oujf1 2013-6-3  */
+#define ID_CAPSENSOR                    (ID_BASE+SENSOR_TYPE_CAPSENSOR-1)
+
+#define ID_SENSOR_MAX_HANDLE			(ID_BASE+14)
 #define ID_NONE							(ID_BASE+16)
 
 #define MAX_ANDROID_SENSOR_NUM	(ID_SENSOR_MAX_HANDLE +1)
@@ -68,6 +73,8 @@
 #define SENSOR_GRAVITY					(1 << ID_GRAVITY)
 #define SENSOR_LINEAR_ACCELERATION		(1 << ID_LINEAR_ACCELERATION)
 #define SENSOR_ROTATION_VECTOR			(1 << ID_ROTATION_VECTOR)
+/*   midify for Cypress Cap sense CY8C20236A support -- by oujf1 2013-6-3  */
+#define SENSOR_CAPSENSOR                (1 << ID_CAPSENSOR)
 
 /*----------------------------------------------------------------------------*/
 #define HWM_INPUTDEV_NAME               "hwmdata"
@@ -75,6 +82,12 @@
 #define HWM_SENSOR_DEV                  "/dev/hwmsensor"
 #define C_MAX_HWMSEN_EVENT_NUM          4 
 /*----------------------------------------------------------------------------*/
+#define ACC_PL_DEV_NAME                 "m_acc_pl"
+#define ACC_INPUTDEV_NAME               "m_acc_input"
+#define ACC_MISC_DEV_NAME               "m_acc_misc"
+#define MAG_PL_DEV_NAME                 "m_mag_pl"
+#define MAG_INPUTDEV_NAME               "m_mag_input"
+#define MAG_MISC_DEV_NAME               "m_mag_misc"
 
 #define EVENT_TYPE_SENSOR				0x01
 #define EVENT_SENSOR_ACCELERATION		SENSOR_ACCELEROMETER
@@ -88,6 +101,8 @@
 #define EVENT_SENSOR_GRAVITY			SENSOR_PRESSURE
 #define EVENT_SENSOR_LINEAR_ACCELERATION		SENSOR_TEMPRERATURE
 #define EVENT_SENSOR_ROTATION_VECTOR	SENSOR_PROXIMITY
+/*   midify for Cypress Cap sense CY8C20236A support -- by oujf1 2013-6-3  */
+#define EVENT_SENSOR_CAPSENSOR          SENSOR_CAPSENSOR
 /*-----------------------------------------------------------------------------*/
 
 enum {

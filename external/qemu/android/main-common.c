@@ -617,8 +617,8 @@ parse_skin_files(const char*      skinDirPath,
             }
 
             snprintf(tmp, sizeof tmp,
-                        "display {\n  width %d\n  height %d\n bpp %d}\n",
-                        width, height,bpp);
+                    "display {\n  width %d\n  height %d\n bpp %d}\n",
+                    width, height,bpp);
             aconfig_load(root, strdup(tmp));
             path = ":";
             D("found magic skin width=%d height=%d bpp=%d\n", width, height, bpp);
@@ -743,7 +743,7 @@ init_sdl_ui(AConfig*         skinConfig,
     /* we're not a game, so allow the screensaver to run */
     setenv("SDL_VIDEO_ALLOW_SCREENSAVER","1",1);
 
-    flags = SDL_INIT_NOPARACHUTE | SDL_INIT_TIMER;
+    flags = SDL_INIT_NOPARACHUTE;
     if (!opts->no_window)
         flags |= SDL_INIT_VIDEO;
 

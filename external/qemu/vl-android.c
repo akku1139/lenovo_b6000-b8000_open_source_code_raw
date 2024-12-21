@@ -1463,7 +1463,12 @@ int usb_device_add_dev(USBDevice *dev)
 
     /* Find a USB port to add the device to.  */
     port = free_usb_ports;
-    if (!port->next) {
+    if (!port){
+        USBDevice *hub = usb_hub_init(VM_USB_HUB_SIZE);
+        port = free_usb_ports;
+        usb_attach(port, hub);
+    }
+    else if (!port->next){
         USBDevice *hub;
 
         /* Create a new hub and chain it on.  */
@@ -1499,9 +1504,6 @@ static int usb_device_add(const char *devname, int is_hotplug)
 {
     const char *p;
     USBDevice *dev;
-
-    if (!free_usb_ports)
-        return -1;
 
     if (strstart(devname, "host:", &p)) {
         dev = usb_host_device_open(p);
@@ -3588,10 +3590,17 @@ int main(int argc, char **argv, char **envp)
                 /* If there is no file= parameters, nand_add_dev will create
                  * a temporary file to back the partition image. */
             } else {
+                /* Create the file if needed */
+                if (!path_exists(sysImage)) {
+                    if (path_empty_file(sysImage) < 0) {
+                        PANIC("Could not create system image file %s: %s", sysImage, strerror(errno));
+                    }
+                }            
                 pstrcat(tmp,sizeof(tmp),",file=");
                 pstrcat(tmp,sizeof(tmp),sysImage);
             }
         }
+        
         if (initImage && *initImage) {
             if (!path_exists(initImage)) {
                 PANIC("Invalid initial system image path: %s", initImage);
@@ -3599,7 +3608,8 @@ int main(int argc, char **argv, char **envp)
             pstrcat(tmp,sizeof(tmp),",initfile=");
             pstrcat(tmp,sizeof(tmp),initImage);
         } else {
-            PANIC("Missing initial system image path!");
+            // Since it's already guarantee the init image is exist in main.c, we can skip this error checking for enable system-qemu mechanism.
+            //PANIC("Missing initial system image path!");
         }
         nand_add_dev(tmp);
     }

@@ -11,6 +11,7 @@
 */
 #include "android/avd/info.h"
 #include "android/avd/util.h"
+#include "android/avd/keys.h"
 #include "android/config/config.h"
 #include "android/utils/path.h"
 #include "android/utils/bufprint.h"
@@ -483,15 +484,30 @@ _avdInfo_getRootIni( AvdInfo*  i )
 static int
 _avdInfo_getContentPath( AvdInfo*  i )
 {
-#   define  ROOT_PATH_KEY    "path"
+    char temp[PATH_MAX], *p=temp, *end=p+sizeof(temp);
 
-    i->contentPath = iniFile_getString(i->rootIni, ROOT_PATH_KEY, NULL);
+    i->contentPath = iniFile_getString(i->rootIni, ROOT_ABS_PATH_KEY, NULL);
 
     if (i->contentPath == NULL) {
         derror("bad config: %s",
-               "virtual device file lacks a "ROOT_PATH_KEY" entry");
+               "virtual device file lacks a "ROOT_ABS_PATH_KEY" entry");
         return -1;
     }
+
+    if (!path_is_dir(i->contentPath)) {
+        // If the absolute path doesn't match an actual directory, try
+        // the relative path if present.
+        const char* relPath = iniFile_getString(i->rootIni, ROOT_REL_PATH_KEY, NULL);
+        if (relPath != NULL) {
+            p = bufprint_config_path(temp, end);
+            p = bufprint(p, end, PATH_SEP "%s", relPath);
+            if (p < end && path_is_dir(temp)) {
+                AFREE(i->contentPath);
+                i->contentPath = ASTRDUP(temp);
+            }
+        }
+    }
+
     D("virtual device content at %s", i->contentPath);
     return 0;
 }
@@ -1000,6 +1016,13 @@ avdInfo_getSystemImagePath( AvdInfo*  i )
 {
     const char* imageName = _imageFileNames[ AVD_IMAGE_USERSYSTEM ];
     return _avdInfo_getContentFilePath(i, imageName);
+}
+
+char*
+avdInfo_getDefaultSystemImagePath( AvdInfo*  i )
+{
+    const char* imageName = _imageFileNames[ AVD_IMAGE_USERSYSTEM ];
+    return _getFullFilePath(i->contentPath, imageName);
 }
 
 char*

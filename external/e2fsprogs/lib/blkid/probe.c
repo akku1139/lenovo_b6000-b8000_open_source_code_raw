@@ -36,6 +36,7 @@
 #include "uuid/uuid.h"
 #include "probe.h"
 
+#define MTK_NOT_BYPASS_FAT_NO_NAME
 static int figure_label_len(const unsigned char *label, int len)
 {
 	const unsigned char *end = label + len - 1;
@@ -616,8 +617,11 @@ static int probe_fat(struct blkid_probe *probe,
 			vol_label = vs->vs_label;
 		vol_serno = vs->vs_serno;
 	}
-
-	if (vol_label && memcmp(vol_label, no_name, 11)) {
+#ifdef MTK_NOT_BYPASS_FAT_NO_NAME
+	if (vol_label){
+#else
+  if (vol_label && memcmp(vol_label, no_name, 11)) {
+#endif
 		if ((label_len = figure_label_len(vol_label, 11)))
 			label = vol_label;
 	}
@@ -1502,14 +1506,15 @@ blkid_dev blkid_verify(blkid_cache cache, blkid_dev dev)
 	unsigned char *buf;
 	const char *type, *value;
 	struct stat st;
-	time_t diff, now;
+	time_t now;
+	double diff;
 	int idx;
 
 	if (!dev)
 		return NULL;
 
 	now = time(0);
-	diff = now - dev->bid_time;
+	diff = difftime(now, dev->bid_time);
 
 	if (stat(dev->bid_name, &st) < 0) {
 		DBG(DEBUG_PROBE,

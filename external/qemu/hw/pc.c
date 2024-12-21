@@ -1128,7 +1128,10 @@ static void pc_init1(ram_addr_t ram_size,
 #if 0
     for(i = 1; i < MAX_SERIAL_PORTS; i++) {
 #else
-    for(i = 1; i < 2; i++) {
+    /**
+     * M: The logcat message is output through TTYS2 so we need to enlarge the TTY devices to 3.( TTYS0 for kernel debug message, TTYS1 for qemud communication, TTYS2 for logcat message )
+     */
+    for(i = 1; i < 3; i++) {
 #endif
         if(serial_hds[i]) {
             goldfish_tty_add(serial_hds[i], i, 0, 0);

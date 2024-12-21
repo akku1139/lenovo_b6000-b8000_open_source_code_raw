@@ -399,6 +399,9 @@ int main (int argc, char **argv)
 	  /* On linux, we keep CAP_NETADMIN (for ARP-injection) and
 	     CAP_NET_RAW (for icmp) if we're doing dhcp */
 	  data->effective = data->permitted = data->inheritable =
+#ifdef __ANDROID__
+	    (1 << CAP_NET_BIND_SERVICE) |
+#endif
 	    (1 << CAP_NET_ADMIN) | (1 << CAP_NET_RAW) | (1 << CAP_SETUID);
 	  
 	  /* Tell kernel to not clear capabilities when dropping root */
@@ -442,6 +445,9 @@ int main (int argc, char **argv)
 
 #ifdef HAVE_LINUX_NETWORK
 	  data->effective = data->permitted = 
+#ifdef __ANDROID__
+	    (1 << CAP_NET_BIND_SERVICE) |
+#endif
 	    (1 << CAP_NET_ADMIN) | (1 << CAP_NET_RAW);
 	  data->inheritable = 0;
 	  
@@ -1015,6 +1021,13 @@ static int check_android_listeners(fd_set *set) {
                 if (params != NULL) {
                     set_servers(params);
                     check_servers();
+                } else {
+                    my_syslog(LOG_ERR, _("Malformatted msg '%s'"), current_cmd);
+                    retcode = -1;
+                }
+            } else if (!strcmp(cmd, "update_ifaces")) {
+                if (params != NULL) {
+                    set_interfaces(params);
                 } else {
                     my_syslog(LOG_ERR, _("Malformatted msg '%s'"), current_cmd);
                     retcode = -1;
